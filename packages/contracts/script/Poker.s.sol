@@ -6,13 +6,11 @@ import {Poker} from "../src/Poker.sol";
 
 contract PokerScript is Script {
     function run() public {
-        // Begin recording transactions for deployment
         vm.startBroadcast();
 
         // Deploy the Poker contract
         new Poker();
 
-        // Stop recording transactions
         vm.stopBroadcast();
     }
 }
