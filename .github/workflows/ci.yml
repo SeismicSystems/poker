@@ -1,95 +1,36 @@
 name: CI
-
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  build-and-test:
+    runs-on: self-hosted
+    concurrency:
+      group: global-self-hosted-runner
+    env:
+      SFOUNDRY_ROOT: /home/azureuser/prototypes/seismic-foundry
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Check out repository
+        uses: actions/checkout@v4
 
-      # Install rust and cargo
-      - name: Install Rust and cargo
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-
-      # Install jq
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
-
-      # Install sfoundryup with explicit path setup
-      - name: Install sfoundryup
+      - name: Build sforge
         run: |
-          curl -L \
-            -H "Accept: application/vnd.github.v3.raw" \
-            "https://api.github.com/repos/SeismicSystems/seismic-foundry/contents/sfoundryup/install?ref=seismic" | bash
+          cd "$SFOUNDRY_ROOT"
+          cargo build --bin sforge
 
-          # Add installation directory to PATH permanently for this job
-          echo "$HOME/.seismic/bin" >> $GITHUB_PATH
-          echo "$HOME/.config/.seismic/bin" >> $GITHUB_PATH
-
-          # Create a local profile file for sourcing
-          echo 'export PATH="$HOME/.seismic/bin:$HOME/.config/.seismic/bin:$PATH"' > $HOME/.seismic_profile
-
-          # Show where sfoundryup is installed
-          find $HOME -name "sfoundryup" 2>/dev/null || echo "sfoundryup not found in home directory"
-
-      # Install Seismic tools with explicit sourcing
-      - name: Install Seismic tools
+      - name: Check formatting
+        working-directory: packages/contracts
         run: |
-          # Source the profile we created
-          source $HOME/.seismic_profile
+          cargo run --bin sforge --manifest-path "$SFOUNDRY_ROOT/Cargo.toml" fmt --check
 
-          # Verify sfoundryup is available
-          which sfoundryup || echo "sfoundryup not in PATH"
-
-          # Try to find and execute it directly if not in PATH
-          if ! which sfoundryup > /dev/null; then
-            SFOUNDRYUP_PATH=$(find $HOME -name "sfoundryup" -type f 2>/dev/null | head -1)
-            if [ -n "$SFOUNDRYUP_PATH" ]; then
-              echo "Executing sfoundryup at $SFOUNDRYUP_PATH"
-              $SFOUNDRYUP_PATH
-            else
-              echo "Could not find sfoundryup executable"
-              exit 1
-            fi
-          else
-            sfoundryup
-          fi
-
-          # Add any new binary paths
-          echo "$HOME/.foundry/bin" >> $GITHUB_PATH
-
-      # Verify tools are installed and in PATH
-      - name: Verify installation
+      - name: Check build
+        working-directory: packages/contracts
         run: |
-          echo "PATH: $PATH"
-          which sforge || echo "sforge not found"
-          which sanvil || echo "sanvil not found"
-          which ssolc || echo "ssolc not found"
-
-      # Clean old build artifacts if needed
-      - name: Clean build artifacts
-        run: |
-          if which sforge > /dev/null; then
-            sforge clean
-          else
-            echo "sforge not available, skipping clean"
-          fi
-        working-directory: ./packages/contracts
-
-      # Build contracts
-      - name: Build contracts
-        run: sforge build
-        working-directory: ./packages/contracts
+          cargo run --bin sforge --manifest-path "$SFOUNDRY_ROOT/Cargo.toml" build
 
       - name: Run tests
-        run: sforge test
-        working-directory: ./packages/contracts
+        working-directory: packages/contracts
+        run: |
+          cargo run --bin sforge --manifest-path "$SFOUNDRY_ROOT/Cargo.toml" test
