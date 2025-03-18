@@ -1,27 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-contract Poker {
-    suint256 private counter;
-    address private admin;
+import {Script} from "forge-std/Script.sol";
+import {Poker} from "../src/Poker.sol";
 
-    constructor() {
-        counter = suint256(0);
-        admin = msg.sender;
-    }
+contract PokerScript is Script {
+    function run() public {
+        // Begin recording transactions for deployment
+        vm.startBroadcast();
 
-    function increment(suint256 amount) public {
-        counter += amount;
-    }
+        // Deploy the Poker contract
+        new Poker();
 
-    function viewCounter() public view onlyAdmin returns (uint256) {
-        return uint256(counter);
-    }
-
-    modifier onlyAdmin() {
-        if (msg.sender != admin) {
-            revert("Only admin can call this function");
-        }
-        _;
+        // Stop recording transactions
+        vm.stopBroadcast();
     }
 }
