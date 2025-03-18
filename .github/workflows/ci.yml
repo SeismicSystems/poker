@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Install rust and cargo
+      - name: Install Rust and cargo
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      # Install jq
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      # Install sfoundryup
+      - name: Install sfoundryup
+        run: |
+          curl -L \
+            -H "Accept: application/vnd.github.v3.raw" \
+            "https://api.github.com/repos/SeismicSystems/seismic-foundry/contents/sfoundryup/install?ref=seismic" | bash
+          echo "$HOME/.foundry/bin" >> $GITHUB_PATH
+
+      # Install sforge, sanvil, ssolc
+      - name: Install Seismic tools
+        run: |
+          sfoundryup
+          echo "$HOME/.foundry/bin" >> $GITHUB_PATH
+
+      # Clean old build artifacts if needed
+      - name: Clean build artifacts
+        run: sforge clean
+        working-directory: ./packages/contracts
+
+      - name: Build contracts
+        run: sforge build
+        working-directory: ./packages/contracts
+
+      - name: Run contract tests
+        run: sforge test
+        working-directory: ./packages/contracts
